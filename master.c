@@ -12,21 +12,27 @@
 //Global Variables
 //Define defaults if no argument entered 
 int max_total_ChildProcess = 4; 
-int max_Concurrent_Children = 2; 
+int user_max_Concurrent_Children = 2; 
 int time_seconds = 100;
 
 //Shared memory
 struct shared_memory {
-	int id;
+	int t_processes;
 	int turn; 
 	int flags[20]; 
 	int index; 
 	char data[SIZE][LENGTH];
-
+	int process_group;
 };
 
+struct shared_memory* shared_m; //Pointer to shared_memory struct (shared_m)
 
+//Never have more than 20 processes in the system at any time even if program is invoked with n>20
+#define MAX_CONCURRENT_CHILDREN 20;
+int current_ConcurrentProcesses = 0; 
+int shared_m_SegId; 
 
+//Main function
 int main(int argc, char* argv[]) {
 	
 	//Check that an argument and/or infile is given 
@@ -102,24 +108,72 @@ int main(int argc, char* argv[]) {
 	}
 	
 	//File is opened
-	//Read from file one string per line, store in array
+	//Read from file, store  one string per line
 	
 	char line[LENGTH];
 	//read line from stream and store it into string pointed by 'line'. Stops when either n characters are read or EOF 
 	while(fgets(line, sizeof(line), fp)){
 		//Terminating symbol at end of string is NULL character
 		line[strlen(line) -1] = '\0';
-		strcpy(
-		
+		strcpy(shared_m->data[i], line); //Copy current line to shared_m data
+		i++; //Increment i by 1
 	}
 	
+	//Each child will test the string at the index assigned to it. The total child proceses are the amount of string lines. if i is greater, then max_total_ChildProcess is i else it will be default value.
+	if(i < max_total_ChildProcess){ 
+		max_total_ChildProcesses = i;
+	}
+	//user set concurrent children must be less than total child processes
+	if(max_total_ChildProcess < user_max_Concurrent_Children) { 
+		user_max_Concurrent_Children = max_total_ChildProcess;
+	}
+	//set total processes in shared memory
+	shared_m->t_processes = max_total_ChildProcesses;
+	//amount of times expected to spawn
+	int spawn_count = max_total_ChildProcesses;
+	//keep track of processes
+	int track_processes
+	while(spawn_count >= 0) { 
+		//check that current amount of processes are less than user set value AND check that processes made so far are less than the max total children allowed to have 
+		if(current_ConcurrrentProcesses < user_max_Concurrent_Children) && (track_processes < max_total_ChildProcess) { 
+			current_ConcurrentProcesses += 1;
+			if(fork() ==-1) { 
+				printf("ERROR: failed to fork");
+				
+			}
+			else if(fork() == 0) { 
+				if(track_processes == 1){
+					shared_m->process_group = getpid();
+					//0 means the process ID of the calling process is used. setpgid joins process group with the session of the calling process
+					setpgid(0, shared_m->process_group);
+					char cpid[256];
+					//set id and send to palin
+					sprintf(cpid, "%d", track_processes + 1);
+					execl("./palin", "palin", cpid, (char*) NULL);
+					
+				}	
+			}
+		}		
+		spawn_count--;
+	}	
 
-		
+	releaseMemory(); 
+	return 0; 
 
-	printf("Max total child process is %d\n", max_total_ChildProcess); 
-	printf("Max concurrent children is %d\n", max_Concurrent_Children); 
-	printf("Time in seconds is %d\n", time_seconds);	
 
-	return 0;
+}
 
+//Signal to kill processes
+void signalHandler(int signal) { 
+	//Ask program to terminate
+	killpg(shared_m->process_group, SIGTERM);
+	releaseMemory();
+	return EXIT_SUCCESS;
+}
+
+//Release shared memory 
+void releaseMemory() { 
+	//detaches shared memory segment
+	shmdt(shared_m); 
+	shmctl(shared_m_SegId, IPC_RMID, NULL);	
 }
