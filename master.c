@@ -2,7 +2,7 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <string.h>
-
+#include <signal.h>
 
 //Constants
 #define SIZE 50
@@ -73,9 +73,9 @@ int main(int argc, char* argv[]) {
 				
 			//Define number of children
 			case 's':
-				max_Concurrent_Children = atoi(optarg); 
+				user_max_Concurrent_Children = atoi(optarg); 
 				//Check that max concurrent children is greater than 0 
-				if(max_Concurrent_Children <= 0) { 
+				if(user_max_Concurrent_Children <= 0) { 
 					printf("ERROR: Concurrent children processes must be greater than 0\n");
 				return EXIT_FAILURE;
 				}
@@ -99,6 +99,8 @@ int main(int argc, char* argv[]) {
 		}
 	}
 
+	int i = 0;
+
 	//Open file. Give error if unreadable 
 	FILE *fp = fopen(argv[optind], "r"); //read from file 
 	//File can't be opened 
@@ -112,7 +114,7 @@ int main(int argc, char* argv[]) {
 	
 	char line[LENGTH];
 	//read line from stream and store it into string pointed by 'line'. Stops when either n characters are read or EOF 
-	while(fgets(line, sizeof(line), fp)){
+	while (fgets(line, sizeof(line), fp) != NULL){
 		//Terminating symbol at end of string is NULL character
 		line[strlen(line) -1] = '\0';
 		strcpy(shared_m->data[i], line); //Copy current line to shared_m data
@@ -121,21 +123,23 @@ int main(int argc, char* argv[]) {
 	
 	//Each child will test the string at the index assigned to it. The total child proceses are the amount of string lines. if i is greater, then max_total_ChildProcess is i else it will be default value.
 	if(i < max_total_ChildProcess){ 
-		max_total_ChildProcesses = i;
+		max_total_ChildProcess = i;
 	}
 	//user set concurrent children must be less than total child processes
 	if(max_total_ChildProcess < user_max_Concurrent_Children) { 
 		user_max_Concurrent_Children = max_total_ChildProcess;
 	}
+	
 	//set total processes in shared memory
-	shared_m->t_processes = max_total_ChildProcesses;
+	shared_m->t_processes = max_total_ChildProcess;
 	//amount of times expected to spawn
-	int spawn_count = max_total_ChildProcesses;
+	int spawn_count = max_total_ChildProcess;
 	//keep track of processes
-	int track_processes
-	while(spawn_count >= 0) { 
+	int track_processes;
+	
+	while (spawn_count >= 0) { 
 		//check that current amount of processes are less than user set value AND check that processes made so far are less than the max total children allowed to have 
-		if(current_ConcurrrentProcesses < user_max_Concurrent_Children) && (track_processes < max_total_ChildProcess) { 
+		if((current_ConcurrentProcesses < user_max_Concurrent_Children) && (track_processes < max_total_ChildProcess)) { 
 			current_ConcurrentProcesses += 1;
 			if(fork() ==-1) { 
 				printf("ERROR: failed to fork");
